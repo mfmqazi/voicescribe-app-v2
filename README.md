@@ -2,6 +2,8 @@
 
 Real-time speech-to-text transcription with automatic Bosnian to English translation.
 
+**[🔴 Live Demo](https://mfmqazi.github.io/voicescribe-app-v2/)**
+
 ## Features
 
 - 🎤 **Live Recording** - Real-time transcription using Web Speech API
