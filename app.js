@@ -1,4 +1,3 @@
-
 // ========================================
 // GOOGLE DRIVE CONFIGURATION
 // ========================================
@@ -13,20 +12,29 @@ const GOOGLE_APP_ID = 'YOUR_PROJECT_NUMBER';
 const state = {
     currentMode: 'record',
     isRecording: false,
-    recognition: null,
-    recordingTimer: null,
+    voskSocket: null,
+    audioContext: null,
+    mediaStream: null,
+    processor: null,
     recordingStartTime: 0,
+    recordingTimer: null,
     currentAudioFile: null,
     transcriptText: '',
     translationText: '',
     translationDebounce: null,
-    worker: null, // Web Worker for Whisper
-    isModelLoading: false,
+
+    // Settings
+    voskUrl: localStorage.getItem('voskUrl') || 'ws://localhost:2700',
+    libreUrl: localStorage.getItem('libreUrl') || 'http://localhost:5000',
+
+    // Google Drive (kept for file picker)
     tokenClient: null,
     accessToken: null,
     pickerInited: false,
     gisInited: false
 };
+
+
 
 // ========================================
 // DOM ELEMENTS
@@ -54,9 +62,15 @@ const elements = {
     transcribeBtn: document.getElementById('transcribeBtn'),
     googleDriveBtn: document.getElementById('googleDriveBtn'),
 
-    // Language
+    // Language & Settings
     languageSelect: document.getElementById('language'),
     originalLanguageLabel: document.getElementById('originalLanguageLabel'),
+    settingsBtn: document.getElementById('settingsBtn'),
+    settingsModal: document.getElementById('settingsModal'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+    voskUrlInput: document.getElementById('voskUrl'),
+    libreUrlInput: document.getElementById('libreUrl'),
 
     // Output
     outputSection: document.getElementById('outputSection'),
@@ -80,56 +94,14 @@ const elements = {
 // INITIALIZATION
 // ========================================
 function init() {
-    checkSpeechRecognitionSupport();
     setupEventListeners();
     updateStats();
     updateLanguageLabels();
-
-    // Initialize Web Worker
-    state.worker = new Worker('worker.js', { type: 'module' });
-
-    state.worker.addEventListener('message', (event) => {
-        const { type, data, error } = event.data;
-
-        if (type === 'ready') {
-            console.log('Whisper model loaded in worker');
-            state.isModelLoading = false;
-        } else if (type === 'download') {
-            // Model downloading progress
-            if (data.status === 'progress') {
-                showToast(`Downloading AI Model: ${Math.round(data.progress)}%`, 'info');
-            }
-        } else if (type === 'error') {
-            showToast(`Error: ${error}`, 'error');
-            resetTranscribeButton();
-        }
-    });
-
-    // Pre-load the model
-    state.worker.postMessage({ type: 'load' });
+    loadSettings();
 
     // Load Google APIs
     if (typeof gapi !== 'undefined') gapi.load('picker', onPickerApiLoad);
     if (typeof google !== 'undefined') onGisLoaded();
-}
-
-function checkSpeechRecognitionSupport() {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        state.recognition = new SpeechRecognition();
-        state.recognition.continuous = true;
-        state.recognition.interimResults = true;
-
-        state.recognition.onresult = handleSpeechResult;
-        state.recognition.onerror = (event) => {
-            console.error('Speech recognition error', event.error);
-            stopRecording();
-            showToast('Microphone error: ' + event.error, 'error');
-        };
-    } else {
-        showToast('Speech Recognition not supported in this browser', 'error');
-        elements.recordBtn.disabled = true;
-    }
 }
 
 function setupEventListeners() {
@@ -160,6 +132,14 @@ function setupEventListeners() {
     // Google Drive
     elements.googleDriveBtn.addEventListener('click', handleGoogleDriveAuth);
 
+    // Settings
+    elements.settingsBtn.addEventListener('click', openSettings);
+    elements.closeSettingsBtn.addEventListener('click', closeSettings);
+    elements.saveSettingsBtn.addEventListener('click', saveSettings);
+    elements.settingsModal.addEventListener('click', (e) => {
+        if (e.target === elements.settingsModal) closeSettings();
+    });
+
     // Actions
     elements.copyBtn.addEventListener('click', copyTranscript);
     elements.downloadBtn.addEventListener('click', downloadTranscript);
@@ -168,6 +148,35 @@ function setupEventListeners() {
 
     // Text Editing
     elements.transcriptText.addEventListener('input', updateStats);
+}
+
+function loadSettings() {
+    elements.voskUrlInput.value = state.voskUrl;
+    elements.libreUrlInput.value = state.libreUrl;
+}
+
+function openSettings() {
+    elements.settingsModal.classList.add('active');
+}
+
+function closeSettings() {
+    elements.settingsModal.classList.remove('active');
+}
+
+function saveSettings() {
+    state.voskUrl = elements.voskUrlInput.value.trim();
+    state.libreUrl = elements.libreUrlInput.value.trim();
+
+    // Remove trailing slash from LibreTranslate URL if present
+    if (state.libreUrl.endsWith('/')) {
+        state.libreUrl = state.libreUrl.slice(0, -1);
+    }
+
+    localStorage.setItem('voskUrl', state.voskUrl);
+    localStorage.setItem('libreUrl', state.libreUrl);
+
+    closeSettings();
+    showToast('Settings saved!', 'success');
 }
 
 // ========================================
@@ -196,32 +205,101 @@ function updateLanguageLabels() {
     elements.originalLanguageLabel.textContent = isBosnian ? '🇧🇦 Bosnian (Original)' : '🇺🇸 English (Original)';
 }
 
-// --- Recording ---
+// --- Vosk Recording Logic ---
 
-function toggleRecording() {
-    if (state.isRecording) {
-        stopRecording();
-    } else {
-        startRecording();
+async function startRecording() {
+    try {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Connect to Vosk Server
+        state.voskSocket = new WebSocket(state.voskUrl);
+
+        state.voskSocket.onopen = () => {
+            console.log('Connected to Vosk Server');
+            setupAudioProcessing();
+
+            // UI Updates
+            state.isRecording = true;
+            state.transcriptText = '';
+            state.translationText = '';
+            updateTranscript('');
+            elements.translationText.textContent = '';
+
+            elements.recordBtn.classList.add('recording');
+            elements.recordStatus.textContent = 'Listening...';
+            elements.recordingInfo.classList.add('active');
+
+            state.recordingStartTime = Date.now();
+            state.recordingTimer = setInterval(updateTimer, 1000);
+        };
+
+        state.voskSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.partial) {
+                // Handle partial results if needed (optional)
+            }
+            if (data.text) {
+                const newText = data.text;
+                if (newText && newText.length > 0) {
+                    state.transcriptText += newText + ' ';
+                    updateTranscript(state.transcriptText);
+
+                    // Translate
+                    if (elements.languageSelect.value === 'bs-BA') {
+                        translateText(newText);
+                    }
+                }
+            }
+        };
+
+        state.voskSocket.onerror = (error) => {
+            console.error('Vosk WebSocket Error:', error);
+            showToast('Connection to Vosk server failed. Check settings.', 'error');
+            stopRecording();
+        };
+
+        state.voskSocket.onclose = () => {
+            console.log('Vosk WebSocket Closed');
+            if (state.isRecording) stopRecording();
+        };
+
+    } catch (error) {
+        console.error('Microphone Error:', error);
+        showToast('Microphone access denied or error.', 'error');
     }
 }
 
-function startRecording() {
-    state.isRecording = true;
-    state.transcriptText = ''; // Clear previous
-    state.translationText = '';
-    updateTranscript('');
-    elements.translationText.textContent = '';
+function setupAudioProcessing() {
+    const source = state.audioContext.createMediaStreamSource(state.mediaStream);
+    // Vosk usually expects 16kHz mono, but server might resample. 
+    // Ideally we should resample here, but for simplicity we send raw float32 or downsampled.
+    // Standard Vosk server often expects raw PCM 16-bit mono at sample rate.
 
-    elements.recordBtn.classList.add('recording');
-    elements.recordStatus.textContent = 'Listening...';
-    elements.recordingInfo.classList.add('active');
+    // We'll use a ScriptProcessor (deprecated but simple) or AudioWorklet.
+    // For simplicity in this v2 demo, let's use ScriptProcessor to downsample to 16kHz.
 
-    state.recognition.lang = elements.languageSelect.value;
-    state.recognition.start();
+    const bufferSize = 4096;
+    state.processor = state.audioContext.createScriptProcessor(bufferSize, 1, 1);
 
-    state.recordingStartTime = Date.now();
-    state.recordingTimer = setInterval(updateTimer, 1000);
+    source.connect(state.processor);
+    state.processor.connect(state.audioContext.destination);
+
+    state.processor.onaudioprocess = (e) => {
+        if (!state.voskSocket || state.voskSocket.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Downsample to 16kHz if needed, or just send if server handles it.
+        // Most Vosk docker images expect 16000Hz.
+        // We'll do a simple downsampling.
+
+        const targetSampleRate = 16000; // Vosk default
+        const downsampledBuffer = downsampleBuffer(inputData, state.audioContext.sampleRate, targetSampleRate);
+
+        // Convert to 16-bit PCM
+        const pcmData = floatTo16BitPCM(downsampledBuffer);
+        state.voskSocket.send(pcmData);
+    };
 }
 
 function stopRecording() {
@@ -232,9 +310,36 @@ function stopRecording() {
     elements.recordStatus.textContent = 'Tap to start recording';
     elements.recordingInfo.classList.remove('active');
 
-    if (state.recognition) state.recognition.stop();
+    if (state.voskSocket) {
+        state.voskSocket.close();
+        state.voskSocket = null;
+    }
+
+    if (state.mediaStream) {
+        state.mediaStream.getTracks().forEach(track => track.stop());
+        state.mediaStream = null;
+    }
+
+    if (state.processor) {
+        state.processor.disconnect();
+        state.processor = null;
+    }
+
+    if (state.audioContext) {
+        state.audioContext.close();
+        state.audioContext = null;
+    }
+
     clearInterval(state.recordingTimer);
     elements.recordTimer.textContent = '0:00';
+}
+
+function toggleRecording() {
+    if (state.isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
 }
 
 function updateTimer() {
@@ -244,59 +349,185 @@ function updateTimer() {
     elements.recordTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function handleSpeechResult(event) {
-    let interimTranscript = '';
-    let finalTranscript = '';
+// --- Audio Utils ---
 
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-        } else {
-            interimTranscript += event.results[i][0].transcript;
-        }
+function downsampleBuffer(buffer, sampleRate, outSampleRate) {
+    if (outSampleRate == sampleRate) {
+        return buffer;
     }
-
-    if (finalTranscript) {
-        state.transcriptText += finalTranscript + ' ';
-        updateTranscript(state.transcriptText);
-
-        // Translate final text
-        if (elements.languageSelect.value === 'bs-BA') {
-            translateText(finalTranscript);
-        }
+    if (outSampleRate > sampleRate) {
+        throw "downsampling rate show be smaller than original sample rate";
     }
+    var sampleRateRatio = sampleRate / outSampleRate;
+    var newLength = Math.round(buffer.length / sampleRateRatio);
+    var result = new Float32Array(newLength);
+    var offsetResult = 0;
+    var offsetBuffer = 0;
+    while (offsetResult < result.length) {
+        var nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        var accum = 0, count = 0;
+        for (var i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+            accum += buffer[i];
+            count++;
+        }
+        result[offsetResult] = accum / count;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+    }
+    return result;
 }
 
-// --- Translation (Live) ---
+function floatTo16BitPCM(output) {
+    var buffer = new ArrayBuffer(output.length * 2);
+    var view = new DataView(buffer);
+    for (var i = 0; i < output.length; i++) {
+        var s = Math.max(-1, Math.min(1, output[i]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
+}
 
-function translateText(text) {
-    // Debounce translation requests
+// --- LibreTranslate Logic ---
+
+async function translateText(text) {
+    if (!text) return;
+
+    // Debounce
     clearTimeout(state.translationDebounce);
     state.translationDebounce = setTimeout(async () => {
         try {
             elements.translationStatus.classList.add('active');
-            // Use MyMemory API for live recording (lightweight)
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=bs|en`;
-            const response = await fetch(url);
+
+            const response = await fetch(`${state.libreUrl}/translate`, {
+                method: "POST",
+                body: JSON.stringify({
+                    q: text,
+                    source: "bs", // Bosnian
+                    target: "en", // English
+                    format: "text"
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (!response.ok) throw new Error('Translation failed');
+
             const data = await response.json();
 
-            if (data.responseStatus === 200 && data.responseData) {
-                const translation = data.responseData.translatedText;
+            if (data.translatedText) {
                 const currentTranslation = elements.translationText.textContent;
-                const newTranslation = currentTranslation ? (currentTranslation + ' ' + translation) : translation;
+                // Simple append for now, ideally we'd match segments
+                const newTranslation = currentTranslation ? (currentTranslation + ' ' + data.translatedText) : data.translatedText;
 
                 state.translationText = newTranslation;
                 elements.translationText.textContent = newTranslation;
             }
+
         } catch (error) {
-            console.error('Translation error:', error);
+            console.error('LibreTranslate Error:', error);
+            // showToast('Translation failed. Check settings.', 'warning');
         } finally {
             elements.translationStatus.classList.remove('active');
         }
     }, 1000);
 }
 
-// --- File Upload ---
+// --- File Upload (Vosk via WebSocket for files is tricky, simulating or using same socket) ---
+// For v2, we'll use the same WebSocket approach but feed the file data.
+
+async function transcribeAudioFile() {
+    if (!state.currentAudioFile) return;
+
+    if (!state.voskUrl) {
+        showToast('Please configure Vosk URL in settings', 'error');
+        return;
+    }
+
+    elements.transcribeBtn.disabled = true;
+    elements.transcribeBtn.classList.add('processing');
+    updateProgress(0, 'Preparing...');
+
+    try {
+        // Decode audio
+        const arrayBuffer = await state.currentAudioFile.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedData = await audioCtx.decodeAudioData(arrayBuffer);
+
+        // Resample to 16kHz
+        const offlineCtx = new OfflineAudioContext(1, decodedData.duration * 16000, 16000);
+        const source = offlineCtx.createBufferSource();
+        source.buffer = decodedData;
+        source.connect(offlineCtx.destination);
+        source.start();
+        const resampledBuffer = await offlineCtx.startRendering();
+        const audioData = resampledBuffer.getChannelData(0); // Float32Array
+
+        // Connect to Vosk
+        const socket = new WebSocket(state.voskUrl);
+
+        updateProgress(10, 'Connecting to server...');
+
+        await new Promise((resolve, reject) => {
+            socket.onopen = resolve;
+            socket.onerror = reject;
+        });
+
+        updateProgress(20, 'Transcribing...');
+
+        // Send data in chunks
+        const chunkSize = 4096;
+        let offset = 0;
+
+        // Listen for results
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.text) {
+                state.transcriptText += data.text + ' ';
+                updateTranscript(state.transcriptText);
+            }
+        };
+
+        // Send loop
+        while (offset < audioData.length) {
+            const end = Math.min(offset + chunkSize, audioData.length);
+            const chunk = audioData.slice(offset, end);
+            const pcmChunk = floatTo16BitPCM(chunk);
+            socket.send(pcmChunk);
+            offset += chunkSize;
+
+            // Update UI occasionally
+            if (offset % (chunkSize * 10) === 0) {
+                const progress = Math.round((offset / audioData.length) * 100);
+                updateProgress(progress, `Transcribing ${progress}%...`);
+                await new Promise(r => setTimeout(r, 10)); // Yield to UI
+            }
+        }
+
+        // Send EOF
+        socket.send('{"eof" : 1}');
+
+        // Wait a bit for final results then close
+        await new Promise(r => setTimeout(r, 2000));
+        socket.close();
+
+        updateProgress(100, 'Complete!');
+        showToast('✅ Transcription complete!', 'success');
+
+        // Translate full text
+        if (elements.languageSelect.value === 'bs-BA') {
+            updateProgress(100, 'Translating...');
+            // Split into chunks for translation if needed, or send whole
+            await translateText(state.transcriptText);
+        }
+
+    } catch (error) {
+        console.error('Transcription error:', error);
+        showToast('❌ Failed: ' + error.message, 'error');
+    } finally {
+        setTimeout(resetTranscribeButton, 1000);
+    }
+}
+
+// --- UI Helpers ---
 
 function handleDrop(e) {
     e.preventDefault();
@@ -319,7 +550,7 @@ function handleFile(file) {
     elements.fileName.textContent = file.name;
     elements.fileSize.textContent = formatFileSize(file.size);
     elements.uploadProgress.classList.add('active');
-    elements.uploadProgress.style.display = 'block'; // Ensure visibility
+    elements.uploadProgress.style.display = 'block';
     elements.transcribeBtn.disabled = false;
     elements.progressFill.style.width = '0%';
 
@@ -328,218 +559,6 @@ function handleFile(file) {
     state.translationText = '';
     updateTranscript('');
     elements.translationText.textContent = '';
-}
-
-async function transcribeAudioFile() {
-    if (!state.currentAudioFile) return;
-
-    // Check if API key is configured
-    const ASSEMBLYAI_API_KEY = '1ffebe07721840f3a94fbafa56eb069f';
-
-    if (ASSEMBLYAI_API_KEY === 'YOUR_ASSEMBLYAI_API_KEY') {
-        showToast('⚠️ Please configure your AssemblyAI API key in app.js', 'error');
-        resetTranscribeButton();
-        return;
-    }
-
-    elements.transcribeBtn.disabled = true;
-    elements.transcribeBtn.classList.add('processing');
-    updateProgress(0, 'Uploading audio...');
-
-    try {
-        // 1. Upload the audio file to AssemblyAI
-        const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
-            method: 'POST',
-            headers: {
-                'authorization': ASSEMBLYAI_API_KEY,
-            },
-            body: state.currentAudioFile
-        });
-
-        if (!uploadResponse.ok) {
-            throw new Error('Failed to upload audio file');
-        }
-
-        const { upload_url } = await uploadResponse.json();
-        updateProgress(20, 'Starting transcription...');
-
-        // 2. Request transcription
-        // Note: AssemblyAI auto-detects language if not specified
-        // For Bosnian, we'll let it auto-detect since 'bs' might not be supported
-        const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
-            method: 'POST',
-            headers: {
-                'authorization': ASSEMBLYAI_API_KEY,
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                audio_url: upload_url,
-                language_detection: true // Auto-detect language
-            })
-        });
-
-        if (!transcriptResponse.ok) {
-            const errorData = await transcriptResponse.json();
-            throw new Error(errorData.error || 'Failed to start transcription');
-        }
-
-        const { id } = await transcriptResponse.json();
-        updateProgress(30, 'Processing...');
-
-        // 3. Poll for completion
-        let transcript = null;
-        while (true) {
-            const pollingResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-                headers: {
-                    'authorization': ASSEMBLYAI_API_KEY
-                }
-            });
-
-            transcript = await pollingResponse.json();
-
-            if (transcript.status === 'completed') {
-                break;
-            } else if (transcript.status === 'error') {
-                throw new Error(transcript.error || 'Transcription failed');
-            }
-
-            // Update progress based on status
-            if (transcript.status === 'processing') {
-                updateProgress(50, 'Transcribing...');
-            } else if (transcript.status === 'queued') {
-                updateProgress(40, 'In queue...');
-            }
-
-            // Wait 2 seconds before polling again
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        updateProgress(90, 'Finalizing...');
-
-        // 4. Display results
-        state.transcriptText = transcript.text;
-        updateTranscript(transcript.text);
-
-        // Translate if Bosnian (using external API with chunking)
-        if (elements.languageSelect.value === 'bs-BA') {
-            updateProgress(95, 'Translating...');
-            try {
-                // Split text into chunks (MyMemory has URL length limits)
-                const MAX_CHUNK_LENGTH = 500; // characters
-                const words = transcript.text.split(' ');
-                let chunks = [];
-                let currentChunk = '';
-
-                for (const word of words) {
-                    if ((currentChunk + ' ' + word).length > MAX_CHUNK_LENGTH) {
-                        chunks.push(currentChunk.trim());
-                        currentChunk = word;
-                    } else {
-                        currentChunk += (currentChunk ? ' ' : '') + word;
-                    }
-                }
-                if (currentChunk) chunks.push(currentChunk.trim());
-
-                // Translate each chunk
-                let fullTranslation = '';
-                for (const chunk of chunks) {
-                    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=bs|en`;
-                    const response = await fetch(url);
-                    const data = await response.json();
-
-                    if (data.responseStatus === 200 && data.responseData) {
-                        fullTranslation += data.responseData.translatedText + ' ';
-                    }
-
-                    // Small delay to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-
-                state.translationText = fullTranslation.trim();
-                elements.translationText.textContent = fullTranslation.trim();
-            } catch (error) {
-                console.error('Translation error:', error);
-                showToast('⚠️ Translation failed, but transcription is complete', 'warning');
-            }
-        }
-
-        updateProgress(100, 'Complete!');
-        showToast('✅ Transcription complete!', 'success');
-
-    } catch (error) {
-        console.error('AssemblyAI error:', error);
-        showToast('❌ Failed: ' + error.message, 'error');
-    } finally {
-        setTimeout(resetTranscribeButton, 1000);
-    }
-}
-
-
-// Helper to remove common Whisper hallucinations (repetitive loops)
-function removeHallucinations(text) {
-    if (!text) return '';
-
-    // 1. Remove single character repetitions (e.g., "u u u u u u")
-    text = text.replace(/\b(\w)\s+\1(\s+\1)+/gi, '');
-
-    // 2. Remove word repetitions (e.g., "nekočas, nekočas, nekočas")
-    text = text.replace(/\b(\w+)([,\s]+\1){2,}/gi, '$1');
-
-    // 3. Remove phrase repetitions - MORE AGGRESSIVE
-    // This catches "and we are going to talk about the reality of the world, and we are going to talk..."
-    // Look for any sequence of 5+ words that repeats
-    const words = text.split(/\s+/);
-    for (let len = 5; len <= 15; len++) {
-        for (let i = 0; i <= words.length - len * 2; i++) {
-            const phrase = words.slice(i, i + len).join(' ').toLowerCase();
-            const nextPhrase = words.slice(i + len, i + len * 2).join(' ').toLowerCase();
-            if (phrase === nextPhrase) {
-                // Found a repetition, remove everything from the second occurrence onward
-                text = words.slice(0, i + len).join(' ');
-                return text.trim();
-            }
-        }
-    }
-
-    // 4. Filter out common hallucinated phrases
-    const hallucinations = [
-        'Subtitles by', 'Amara.org', 'Audible', 'MOJE', 'uvolestnji',
-        'Thank you for watching', 'Subscribe', 'Like and subscribe'
-    ];
-
-    for (const h of hallucinations) {
-        if (text.toLowerCase().includes(h.toLowerCase())) return '';
-    }
-
-    // 5. If text is mostly repetitive characters, discard it
-    const uniqueChars = new Set(text.replace(/\s/g, '')).size;
-    if (text.length > 50 && uniqueChars < 5) return '';
-
-    return text.trim();
-}
-
-async function translateChunk(text) {
-    if (!text) return;
-
-    try {
-        elements.translationStatus.classList.add('active');
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=bs|en`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.responseStatus === 200 && data.responseData) {
-            const translation = data.responseData.translatedText;
-            const currentTranslation = elements.translationText.textContent;
-            const newTranslation = currentTranslation ? (currentTranslation + ' ' + translation) : translation;
-
-            state.translationText = newTranslation;
-            elements.translationText.textContent = newTranslation;
-        }
-    } catch (error) {
-        console.error('Translation error:', error);
-    } finally {
-        elements.translationStatus.classList.remove('active');
-    }
 }
 
 function updateProgress(percent, text) {
