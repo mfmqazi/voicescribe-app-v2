@@ -389,12 +389,10 @@ function floatTo16BitPCM(output) {
 
 // --- LibreTranslate Logic ---
 
-async function translateText(text) {
+async function translateText(text, immediate = false) {
     if (!text) return;
 
-    // Debounce
-    clearTimeout(state.translationDebounce);
-    state.translationDebounce = setTimeout(async () => {
+    const doTranslate = async () => {
         try {
             elements.translationStatus.classList.add('active');
 
@@ -409,26 +407,48 @@ async function translateText(text) {
                 headers: { "Content-Type": "application/json" }
             });
 
-            if (!response.ok) throw new Error('Translation failed');
+            if (!response.ok) throw new Error(`Translation failed: ${response.statusText}`);
 
             const data = await response.json();
 
             if (data.translatedText) {
-                const currentTranslation = elements.translationText.textContent;
-                // Simple append for now, ideally we'd match segments
-                const newTranslation = currentTranslation ? (currentTranslation + ' ' + data.translatedText) : data.translatedText;
+                // For file upload (immediate), we replace. For live, we might want to append or replace.
+                // Since we pass the FULL text for file upload, replacing is correct.
+                // For live, we usually append to state.transcriptText and call this with the NEW chunk.
+                // Wait, for live recording, we are appending newText to state.transcriptText, 
+                // but passing ONLY newText to translateText.
+                // So for live, we should APPEND.
+                // For file upload, we pass the WHOLE text.
 
-                state.translationText = newTranslation;
-                elements.translationText.textContent = newTranslation;
+                // Let's handle this by checking if we are in 'immediate' mode (file upload) or not.
+
+                if (immediate) {
+                    state.translationText = data.translatedText;
+                    elements.translationText.textContent = data.translatedText;
+                } else {
+                    // Live mode: append
+                    const currentTranslation = elements.translationText.textContent;
+                    const newTranslation = currentTranslation ? (currentTranslation + ' ' + data.translatedText) : data.translatedText;
+                    state.translationText = newTranslation;
+                    elements.translationText.textContent = newTranslation;
+                }
             }
 
         } catch (error) {
             console.error('LibreTranslate Error:', error);
-            // showToast('Translation failed. Check settings.', 'warning');
+            showToast('Translation failed. Check settings.', 'warning');
         } finally {
             elements.translationStatus.classList.remove('active');
         }
-    }, 1000);
+    };
+
+    if (immediate) {
+        await doTranslate();
+    } else {
+        // Debounce for live recording
+        clearTimeout(state.translationDebounce);
+        state.translationDebounce = setTimeout(doTranslate, 1000);
+    }
 }
 
 // --- File Upload (Vosk via WebSocket for files is tricky, simulating or using same socket) ---
@@ -515,8 +535,12 @@ async function transcribeAudioFile() {
         // Translate full text
         if (elements.languageSelect.value === 'bs-BA') {
             updateProgress(100, 'Translating...');
-            // Split into chunks for translation if needed, or send whole
-            await translateText(state.transcriptText);
+            // Use the LibreTranslate function
+            // Note: LibreTranslate might also need chunking if text is huge, 
+            // but for now we'll try sending it all or rely on translateText's logic if we improve it.
+            // Since translateText is currently simple, let's just call it.
+            // If the text is very long, we might want to split it by sentences, but let's start with this.
+            await translateText(state.transcriptText, true);
         }
 
     } catch (error) {
