@@ -1,0 +1,16 @@
+{
+  "name": "voicescribe-app",
+  "version": "1.0.0",
+  "description": "VoiceScribe - Speech to Text with Translation",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
