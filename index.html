@@ -36,186 +36,245 @@
                             <stop offset="0%" style="stop-color:#8B5CF6" />
                             <stop offset="100%" style="stop-color:#EC4899" />
                         </linearGradient>
-                        <div class="mode-toggle">
-                            <button id="recordModeBtn" class="mode-btn active" data-mode="record">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <circle cx="10" cy="8" r="3" />
-                                    <path
-                                        d="M6 7C6 6.44772 5.55228 6 5 6C4.44772 6 4 6.44772 4 7C4 10.3137 6.68629 13 10 13C13.3137 13 16 10.3137 16 7C16 6.44772 15.5523 6 15 6C14.4477 6 14 6.44772 14 7C14 9.20914 12.2091 11 10 11C7.79086 11 6 9.20914 6 7Z" />
-                                    <path
-                                        d="M10 14C10.5523 14 11 14.4477 11 15V16C11 16.5523 10.5523 17 10 17C9.44772 17 9 16.5523 9 16V15C9 14.4477 9.44772 14 10 14Z" />
-                                </svg>
-                                Live Recording
-                            </button>
-                            <button id="uploadModeBtn" class="mode-btn" data-mode="upload">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                    <path
-                                        d="M10 3C10.5523 3 11 3.44772 11 4V10.5858L12.2929 9.29289C12.6834 8.90237 13.3166 8.90237 13.7071 9.29289C14.0976 9.68342 14.0976 10.3166 13.7071 10.7071L10.7071 13.7071C10.3166 14.0976 9.68342 14.0976 9.29289 13.7071L6.29289 10.7071C5.90237 10.3166 5.90237 9.68342 6.29289 9.29289C6.68342 8.90237 7.31658 8.90237 7.70711 9.29289L9 10.5858V4C9 3.44772 9.44772 3 10 3Z" />
-                                    <path
-                                        d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
-                                </svg>
-                                Upload File
-                            </button>
-                        </div>
+                    </defs>
+                </svg>
+                <h1>VoiceScribe</h1>
+            </div>
+            <div class="header-controls">
+                <div class="language-selector">
+                    <label for="languageSelect">Select Language</label>
+                    <select id="languageSelect">
+                        <option value="bs">🇧🇦 Bosnian</option>
+                        <option value="en">🇺🇸 English</option>
+                    </select>
+                </div>
+                <button id="settingsBtn" class="icon-btn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" />
+                    </svg>
+                </button>
+            </div>
+        </header>
 
-                        <!-- Record Mode -->
-                        <div id="recordMode" class="input-section active">
-                            <div class="record-container">
-                                <div class="record-visualizer">
-                                    <div class="pulse-ring"></div>
-                                    <div class="pulse-ring delay-1"></div>
-                                    <div class="pulse-ring delay-2"></div>
-                                    <button id="recordBtn" class="record-btn" aria-label="Start Recording">
-                                        <svg class="mic-icon" width="32" height="32" viewBox="0 0 32 32"
-                                            fill="currentColor">
-                                            <path
-                                                d="M16 4C14.3431 4 13 5.34315 13 7V15C13 16.6569 14.3431 18 16 18C17.6569 18 19 16.6569 19 15V7C19 5.34315 17.6569 4 16 4Z" />
-                                            <path
-                                                d="M9 14C9 13.4477 8.55228 13 8 13C7.44772 13 7 13.4477 7 14C7 18.4183 10.5817 22 15 22V25H12C11.4477 25 11 25.4477 11 26C11 26.5523 11.4477 27 12 27H20C20.5523 27 21 26.5523 21 26C21 25.4477 20.5523 25 20 25H17V22C21.4183 22 25 18.4183 25 14C25 13.4477 24.5523 13 24 13C23.4477 13 23 13.4477 23 14C23 17.3137 20.3137 20 17 20C13.6863 20 11 17.3137 11 14C11 13.4477 10.5523 13 10 13C9.44772 13 9 13.4477 9 14Z" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <p class="record-status" id="recordStatus">Tap to start recording</p>
-                                <div class="recording-info" id="recordingInfo">
-                                    <span class="recording-indicator">● Recording</span>
-                                    <span class="recording-timer" id="recordTimer">0:00</span>
-                                </div>
-                            </div>
-                        </div>
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="mode-toggle">
+                <button id="recordModeBtn" class="mode-btn active" data-mode="record">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <circle cx="10" cy="8" r="3" />
+                        <path
+                            d="M6 7C6 6.44772 5.55228 6 5 6C4.44772 6 4 6.44772 4 7C4 10.3137 6.68629 13 10 13C13.3137 13 16 10.3137 16 7C16 6.44772 15.5523 6 15 6C14.4477 6 14 6.44772 14 7C14 9.20914 12.2091 11 10 11C7.79086 11 6 9.20914 6 7Z" />
+                        <path
+                            d="M10 14C10.5523 14 11 14.4477 11 15V16C11 16.5523 10.5523 17 10 17C9.44772 17 9 16.5523 9 16V15C9 14.4477 9.44772 14 10 14Z" />
+                    </svg>
+                    Live Recording
+                </button>
+                <button id="uploadModeBtn" class="mode-btn" data-mode="upload">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                            d="M10 3C10.5523 3 11 3.44772 11 4V10.5858L12.2929 9.29289C12.6834 8.90237 13.3166 8.90237 13.7071 9.29289C14.0976 9.68342 14.0976 10.3166 13.7071 10.7071L10.7071 13.7071C10.3166 14.0976 9.68342 14.0976 9.29289 13.7071L6.29289 10.7071C5.90237 10.3166 5.90237 9.68342 6.29289 9.29289C6.68342 8.90237 7.31658 8.90237 7.70711 9.29289L9 10.5858V4C9 3.44772 9.44772 3 10 3Z" />
+                        <path
+                            d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
+                    </svg>
+                    Upload File
+                </button>
+            </div>
 
-                        <!-- Upload Mode -->
-                        <div id="uploadMode" class="input-section">
-                            <div class="upload-container">
-                                <div class="upload-zone" id="uploadZone">
-                                    <svg class="upload-icon" width="48" height="48" viewBox="0 0 48 48" fill="none"
-                                        stroke="currentColor" stroke-width="2">
-                                        <path d="M24 8V32M24 8L16 16M24 8L32 16" />
-                                        <path d="M8 32C8 32 8 40 16 40H32C40 40 40 32 40 32" />
-                                    </svg>
-                                    <h3>Drop audio file here</h3>
-                                    <p>or click to browse</p>
-                                    <p class="file-types">Supports MP3, WAV, M4A, OGG</p>
-                                    <input type="file" id="fileInput" accept="audio/*" hidden>
-
-                                    <div class="divider"><span>OR</span></div>
-
-                                    <button id="googleDriveBtn" class="drive-btn">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M3.5 10.5L6.5 5.5H13.5L16.5 10.5L13.5 15.5H6.5L3.5 10.5Z"
-                                                fill="none" stroke="currentColor" stroke-width="1.5" />
-                                            <path d="M6.5 5.5L3.5 10.5L6.5 15.5" stroke="currentColor"
-                                                stroke-width="1.5" />
-                                            <path d="M13.5 5.5L16.5 10.5L13.5 15.5" stroke="currentColor"
-                                                stroke-width="1.5" />
-                                            <path d="M4.2 10.5H15.8" stroke="currentColor" stroke-width="1.5" />
-                                        </svg>
-                                        Import from Google Drive
-                                    </button>
-                                </div>
-                                <div class="upload-progress" id="uploadProgress">
-                                    <div class="file-info">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                            <path
-                                                d="M13 16V8C13 7.44772 12.5523 7 12 7C11.4477 7 11 7.44772 11 8V16C11 16.5523 11.4477 17 12 17C12.5523 17 13 16.5523 13 16Z" />
-                                            <path
-                                                d="M9 13C9 12.4477 8.55228 12 8 12C7.44772 12 7 12.4477 7 13C7 15.2091 8.79086 17 11 17V19H10C9.44772 19 9 19.4477 9 20C9 20.5523 9.44772 21 10 21H14C14.5523 21 15 20.5523 15 20C15 19.4477 14.5523 19 14 19H13V17C15.2091 17 17 15.2091 17 13C17 12.4477 16.5523 12 16 12C15.4477 12 15 12.4477 15 13C15 14.1046 14.1046 15 13 15C11.8954 15 11 14.1046 11 13C11 12.4477 10.5523 12 10 12C9.44772 12 9 12.4477 9 13Z" />
-                                        </svg>
-                                        <div class="file-details">
-                                            <p class="file-name" id="fileName">audio.mp3</p>
-                                            <p class="file-size" id="fileSize">2.4 MB</p>
-                                        </div>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="progressFill"></div>
-                                    </div>
-                                    <button id="transcribeBtn" class="transcribe-btn">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                            <path
-                                                d="M10 3C10.5523 3 11 3.44772 11 4V9.58579L13.2929 7.29289C13.6834 6.90237 14.3166 6.90237 14.7071 7.29289C15.0976 7.68342 15.0976 8.31658 14.7071 8.70711L10.7071 12.7071C10.3166 13.0976 9.68342 13.0976 9.29289 12.7071L5.29289 8.70711C4.90237 8.31658 4.90237 7.68342 5.29289 7.29289C5.68342 6.90237 6.31658 6.90237 6.70711 7.29289L9 9.58579V4C9 3.44772 9.44772 3 10 3Z" />
-                                            <path
-                                                d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
-                                        </svg>
-                                        Transcribe Audio
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Transcription Output with Translation -->
-                        <div class="output-section" id="outputSection">
-                            <div class="output-header">
-                                <h2>Results</h2>
-                                <div class="output-actions">
-                                    <button id="copyBtn" class="action-btn" title="Copy to clipboard">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                            <path
-                                                d="M8 2C7.44772 2 7 2.44772 7 3V4H6C4.89543 4 4 4.89543 4 6V16C4 17.1046 4.89543 18 6 18H12C13.1046 18 14 17.1046 14 16V15H15C16.1046 15 17 14.1046 17 13V5C17 3.89543 16.1046 3 15 3H14V2C14 1.44772 13.5523 1 13 1H8ZM12 15V16H6V6H7V13C7 14.1046 7.89543 15 9 15H12ZM9 13V5H15V13H9Z" />
-                                        </svg>
-                                    </button>
-                                    <button id="downloadBtn" class="action-btn" title="Download as text file">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                            <path
-                                                d="M10 3C10.5523 3 11 3.44772 11 4V10.5858L12.2929 9.29289C12.6834 8.90237 13.3166 8.90237 13.7071 9.29289C14.0976 9.68342 14.0976 10.3166 13.7071 10.7071L10.7071 13.7071C10.3166 14.0976 9.68342 14.0976 9.29289 13.7071L6.29289 10.7071C5.90237 10.3166 5.90237 9.68342 6.29289 9.29289C6.68342 8.90237 7.31658 8.90237 7.70711 9.29289L9 10.5858V4C9 3.44772 9.44772 3 10 3Z" />
-                                            <path
-                                                d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
-                                        </svg>
-                                    </button>
-                                    <button id="clearBtn" class="action-btn" title="Clear transcription">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd"
-                                                d="M6.70711 5.29289C6.31658 4.90237 5.68342 4.90237 5.29289 5.29289C4.90237 5.68342 4.90237 6.31658 5.29289 6.70711L8.58579 10L5.29289 13.2929C4.90237 13.6834 4.90237 14.3166 5.29289 14.7071C5.68342 15.0976 6.31658 15.0976 6.70711 14.7071L10 11.4142L13.2929 14.7071C13.6834 15.0976 14.3166 15.0976 14.7071 14.7071C15.0976 14.3166 15.0976 13.6834 14.7071 13.2929L11.4142 10L14.7071 6.70711C15.0976 6.31658 15.0976 5.68342 14.7071 5.29289C14.3166 4.90237 13.6834 4.90237 13.2929 5.29289L10 8.58579L6.70711 5.29289Z" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Dual Column Layout -->
-                            <div class="transcript-columns">
-                                <!-- Original Transcription -->
-                                <div class="transcript-panel">
-                                    <div class="panel-header">
-                                        <h3 id="originalLanguageLabel">Original</h3>
-                                    </div>
-                                    <div class="transcript-container">
-                                        <p class="transcript-placeholder">Your transcription will appear here...</p>
-                                        <div class="transcript-text" id="transcriptText" contenteditable="true"></div>
-                                    </div>
-                                </div>
-
-                                <!-- English Translation -->
-                                <div class="transcript-panel translation-panel" id="translationPanel">
-                                    <div class="panel-header">
-                                        <h3>🇺🇸 English Translation</h3>
-                                        <div class="translation-status" id="translationStatus">
-                                            <svg class="spinner" width="16" height="16" viewBox="0 0 16 16"
-                                                fill="currentColor">
-                                                <path opacity="0.3"
-                                                    d="M8 2C8.55228 2 9 2.44772 9 3V5C9 5.55228 8.55228 6 8 6C7.44772 6 7 5.55228 7 5V3C7 2.44772 7.44772 2 8 2Z" />
-                                                <path
-                                                    d="M8 10C8.55228 10 9 10.4477 9 11V13C9 13.5523 8.55228 14 8 14C7.44772 14 7 13.5523 7 13V11C7 10.4477 7.44772 10 8 10Z" />
-                                            </svg>
-                                            <span>Translating...</span>
-                                        </div>
-                                    </div>
-                                    <div class="transcript-container">
-                                        <p class="transcript-placeholder">English translation will appear here...</p>
-                                        <div class="transcript-text" id="translationText" contenteditable="true"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="transcript-stats" id="transcriptStats">
-                                <span class="stat"><strong>Words:</strong> <span id="wordCount">0</span></span>
-                                <span class="stat"><strong>Characters:</strong> <span id="charCount">0</span></span>
-                            </div>
-                        </div>
-
-                        <!-- Notification Toast -->
-                        <div class="toast" id="toast">
-                            <svg class="toast-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd"
-                                    d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18ZM13.7071 8.70711C14.0976 8.31658 14.0976 7.68342 13.7071 7.29289C13.3166 6.90237 12.6834 6.90237 12.2929 7.29289L9 10.5858L7.70711 9.29289C7.31658 8.90237 6.68342 8.90237 6.29289 9.29289C5.90237 9.68342 5.90237 10.3166 6.29289 10.7071L8.29289 12.7071C8.68342 13.0976 9.31658 13.0976 9.70711 12.7071L13.7071 8.70711Z" />
+            <!-- Record Mode -->
+            <div id="recordMode" class="input-section active">
+                <div class="record-container">
+                    <div class="record-visualizer">
+                        <div class="pulse-ring"></div>
+                        <div class="pulse-ring delay-1"></div>
+                        <div class="pulse-ring delay-2"></div>
+                        <button id="recordBtn" class="record-btn" aria-label="Start Recording">
+                            <svg class="mic-icon" width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                                <path
+                                    d="M16 4C14.3431 4 13 5.34315 13 7V15C13 16.6569 14.3431 18 16 18C17.6569 18 19 16.6569 19 15V7C19 5.34315 17.6569 4 16 4Z" />
+                                <path
+                                    d="M9 14C9 13.4477 8.55228 13 8 13C7.44772 13 7 13.4477 7 14C7 18.4183 10.5817 22 15 22V25H12C11.4477 25 11 25.4477 11 26C11 26.5523 11.4477 27 12 27H20C20.5523 27 21 26.5523 21 26C21 25.4477 20.5523 25 20 25H17V22C21.4183 22 25 18.4183 25 14C25 13.4477 24.5523 13 24 13C23.4477 13 23 13.4477 23 14C23 17.3137 20.3137 20 17 20C13.6863 20 11 17.3137 11 14C11 13.4477 10.5523 13 10 13C9.44772 13 9 13.4477 9 14Z" />
                             </svg>
-                            <span class="toast-message" id="toastMessage">Success!</span>
+                        </button>
+                    </div>
+                    <p class="record-status" id="recordStatus">Tap to start recording</p>
+                    <div class="recording-info" id="recordingInfo">
+                        <span class="recording-indicator">● Recording</span>
+                        <span class="recording-timer" id="recordTimer">0:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Mode -->
+            <div id="uploadMode" class="input-section">
+                <div class="upload-container">
+                    <div class="upload-zone" id="uploadZone">
+                        <svg class="upload-icon" width="48" height="48" viewBox="0 0 48 48" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M24 8V32M24 8L16 16M24 8L32 16" />
+                            <path d="M8 32C8 32 8 40 16 40H32C40 40 40 32 40 32" />
+                        </svg>
+                        <h3>Drop audio file here</h3>
+                        <p>or click to browse</p>
+                        <p class="file-types">Supports MP3, WAV, M4A, OGG</p>
+                        <input type="file" id="fileInput" accept="audio/*" hidden>
+
+                        <div class="divider"><span>OR</span></div>
+
+                        <button id="googleDriveBtn" class="drive-btn">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M3.5 10.5L6.5 5.5H13.5L16.5 10.5L13.5 15.5H6.5L3.5 10.5Z" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" />
+                                <path d="M6.5 5.5L3.5 10.5L6.5 15.5" stroke="currentColor" stroke-width="1.5" />
+                                <path d="M13.5 5.5L16.5 10.5L13.5 15.5" stroke="currentColor" stroke-width="1.5" />
+                                <path d="M4.2 10.5H15.8" stroke="currentColor" stroke-width="1.5" />
+                            </svg>
+                            Import from Google Drive
+                        </button>
+                    </div>
+                    <div class="upload-progress" id="uploadProgress">
+                        <div class="file-info">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M13 16V8C13 7.44772 12.5523 7 12 7C11.4477 7 11 7.44772 11 8V16C11 16.5523 11.4477 17 12 17C12.5523 17 13 16.5523 13 16Z" />
+                                <path
+                                    d="M9 13C9 12.4477 8.55228 12 8 12C7.44772 12 7 12.4477 7 13C7 15.2091 8.79086 17 11 17V19H10C9.44772 19 9 19.4477 9 20C9 20.5523 9.44772 21 10 21H14C14.5523 21 15 20.5523 15 20C15 19.4477 14.5523 19 14 19H13V17C15.2091 17 17 15.2091 17 13C17 12.4477 16.5523 12 16 12C15.4477 12 15 12.4477 15 13C15 14.1046 14.1046 15 13 15C11.8954 15 11 14.1046 11 13C11 12.4477 10.5523 12 10 12C9.44772 12 9 12.4477 9 13Z" />
+                            </svg>
+                            <div class="file-details">
+                                <p class="file-name" id="fileName">audio.mp3</p>
+                                <p class="file-size" id="fileSize">2.4 MB</p>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <button id="transcribeBtn" class="transcribe-btn">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M10 3C10.5523 3 11 3.44772 11 4V9.58579L13.2929 7.29289C13.6834 6.90237 14.3166 6.90237 14.7071 7.29289C15.0976 7.68342 15.0976 8.31658 14.7071 8.70711L10.7071 12.7071C10.3166 13.0976 9.68342 13.0976 9.29289 12.7071L5.29289 8.70711C4.90237 8.31658 4.90237 7.68342 5.29289 7.29289C5.68342 6.90237 6.31658 6.90237 6.70711 7.29289L9 9.58579V4C9 3.44772 9.44772 3 10 3Z" />
+                                <path
+                                    d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
+                            </svg>
+                            Transcribe Audio
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transcription Output with Translation -->
+            <div class="output-section" id="outputSection">
+                <div class="output-header">
+                    <h2>Results</h2>
+                    <div class="output-actions">
+                        <button id="copyBtn" class="action-btn" title="Copy to clipboard">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M8 2C7.44772 2 7 2.44772 7 3V4H6C4.89543 4 4 4.89543 4 6V16C4 17.1046 4.89543 18 6 18H12C13.1046 18 14 17.1046 14 16V15H15C16.1046 15 17 14.1046 17 13V5C17 3.89543 16.1046 3 15 3H14V2C14 1.44772 13.5523 1 13 1H8ZM12 15V16H6V6H7V13C7 14.1046 7.89543 15 9 15H12ZM9 13V5H15V13H9Z" />
+                            </svg>
+                        </button>
+                        <button id="downloadBtn" class="action-btn" title="Download as text file">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M10 3C10.5523 3 11 3.44772 11 4V10.5858L12.2929 9.29289C12.6834 8.90237 13.3166 8.90237 13.7071 9.29289C14.0976 9.68342 14.0976 10.3166 13.7071 10.7071L10.7071 13.7071C10.3166 14.0976 9.68342 14.0976 9.29289 13.7071L6.29289 10.7071C5.90237 10.3166 5.90237 9.68342 6.29289 9.29289C6.68342 8.90237 7.31658 8.90237 7.70711 9.29289L9 10.5858V4C9 3.44772 9.44772 3 10 3Z" />
+                                <path
+                                    d="M4 13C4.55228 13 5 13.4477 5 14V15C5 15.5523 5.55228 16 6 16H14C14.5523 16 15 15.5523 15 15V14C15 13.4477 15.4477 13 16 13C16.5523 13 17 13.4477 17 14V15C17 16.6569 15.6569 18 14 18H6C4.34315 18 3 16.6569 3 15V14C3 13.4477 3.44772 13 4 13Z" />
+                            </svg>
+                        </button>
+                        <button id="clearBtn" class="action-btn" title="Clear transcription">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M6.70711 5.29289C6.31658 4.90237 5.68342 4.90237 5.29289 5.29289C4.90237 5.68342 4.90237 6.31658 5.29289 6.70711L8.58579 10L5.29289 13.2929C4.90237 13.6834 4.90237 14.3166 5.29289 14.7071C5.68342 15.0976 6.31658 15.0976 6.70711 14.7071L10 11.4142L13.2929 14.7071C13.6834 15.0976 14.3166 15.0976 14.7071 14.7071C15.0976 14.3166 15.0976 13.6834 14.7071 13.2929L11.4142 10L14.7071 6.70711C15.0976 6.31658 15.0976 5.68342 14.7071 5.29289C14.3166 4.90237 13.6834 4.90237 13.2929 5.29289L10 8.58579L6.70711 5.29289Z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dual Column Layout -->
+                <div class="transcript-columns">
+                    <!-- Original Transcription -->
+                    <div class="transcript-panel">
+                        <div class="panel-header">
+                            <h3 id="originalLanguageLabel">Original</h3>
+                        </div>
+                        <div class="transcript-container">
+                            <p class="transcript-placeholder">Your transcription will appear here...</p>
+                            <div class="transcript-text" id="transcriptText" contenteditable="true"></div>
+                        </div>
+                    </div>
+
+                    <!-- English Translation -->
+                    <div class="transcript-panel translation-panel" id="translationPanel">
+                        <div class="panel-header">
+                            <h3>🇺🇸 English Translation</h3>
+                            <div class="translation-status" id="translationStatus">
+                                <svg class="spinner" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path opacity="0.3"
+                                        d="M8 2C8.55228 2 9 2.44772 9 3V5C9 5.55228 8.55228 6 8 6C7.44772 6 7 5.55228 7 5V3C7 2.44772 7.44772 2 8 2Z" />
+                                    <path
+                                        d="M8 10C8.55228 10 9 10.4477 9 11V13C9 13.5523 8.55228 14 8 14C7.44772 14 7 13.5523 7 13V11C7 10.4477 7.44772 10 8 10Z" />
+                                </svg>
+                                <span>Translating...</span>
+                            </div>
+                        </div>
+                        <div class="transcript-container">
+                            <p class="transcript-placeholder">English translation will appear here...</p>
+                            <div class="transcript-text" id="translationText" contenteditable="true"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="transcript-stats" id="transcriptStats">
+                    <span class="stat"><strong>Words:</strong> <span id="wordCount">0</span></span>
+                    <span class="stat"><strong>Characters:</strong> <span id="charCount">0</span></span>
+                </div>
+            </div>
+
+            <!-- Notification Toast -->
+            <div class="toast" id="toast">
+                <svg class="toast-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18ZM13.7071 8.70711C14.0976 8.31658 14.0976 7.68342 13.7071 7.29289C13.3166 6.90237 12.6834 6.90237 12.2929 7.29289L9 10.5858L7.70711 9.29289C7.31658 8.90237 6.68342 8.90237 6.29289 9.29289C5.90237 9.68342 5.90237 10.3166 6.29289 10.7071L8.29289 12.7071C8.68342 13.0976 9.31658 13.0976 9.70711 12.7071L13.7071 8.70711Z" />
+                </svg>
+                <span class="toast-message" id="toastMessage">Success!</span>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Built with ❤️ using Vosk & LibreTranslate</p>
+        </footer>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="closeSettingsBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="voskUrl">Vosk WebSocket URL</label>
+                    <input type="text" id="voskUrl" placeholder="ws://localhost:2700" value="ws://localhost:2700">
+                    <p class="help-text">WebSocket endpoint for Vosk server</p>
+                </div>
+                <div class="form-group">
+                    <label for="libreUrl">LibreTranslate URL</label>
+                    <input type="text" id="libreUrl" placeholder="http://localhost:5000" value="http://localhost:5000">
+                    <p class="help-text">HTTP endpoint for LibreTranslate server</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveSettingsBtn" class="primary-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Google Drive configuration (not committed to Git) -->
+    <script src="config.js"></script>
+    <script async defer src="https://apis.google.com/js/api.js"></script>
+    <script async defer src="https://accounts.google.com/gsi/client"></script>
+    <script type="module" src="app.js"></script>
+</body>
 
 </html>
