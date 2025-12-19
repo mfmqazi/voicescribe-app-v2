@@ -25,7 +25,11 @@ const state = {
 
     // Settings
     voskUrl: localStorage.getItem('voskUrl') || 'ws://localhost:2700',
-    libreUrl: localStorage.getItem('libreUrl') || 'http://localhost:5000',
+    libreUrl: localStorage.getItem('libreUrl') || 'https://libretranslate.com',
+
+    // Web Speech API fallback
+    recognition: null,
+    useWebSpeechAPI: localStorage.getItem('useWebSpeechAPI') === 'true' || false,
 
     // Google Drive (kept for file picker)
     tokenClient: null,
@@ -63,7 +67,7 @@ const elements = {
     googleDriveBtn: document.getElementById('googleDriveBtn'),
 
     // Language & Settings
-    languageSelect: document.getElementById('language'),
+    languageSelect: document.getElementById('languageSelect'),
     originalLanguageLabel: document.getElementById('originalLanguageLabel'),
     settingsBtn: document.getElementById('settingsBtn'),
     settingsModal: document.getElementById('settingsModal'),
@@ -201,13 +205,122 @@ function switchMode(mode) {
 }
 
 function updateLanguageLabels() {
-    const isBosnian = elements.languageSelect.value === 'bs-BA';
+    const isBosnian = elements.languageSelect.value === 'bs';
     elements.originalLanguageLabel.textContent = isBosnian ? '🇧🇦 Bosnian (Original)' : '🇺🇸 English (Original)';
 }
 
-// --- Vosk Recording Logic ---
+// --- Recording Logic ---
 
 async function startRecording() {
+    // Always use Web Speech API (more portable, works everywhere with internet)
+    // Vosk requires local server which isn't practical for mobile/portable use
+    if (isWebSpeechSupported()) {
+        startWebSpeechRecording();
+    } else {
+        // Fallback to Vosk if Web Speech API is not available
+        startVoskRecording();
+    }
+}
+
+function isWebSpeechSupported() {
+    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+}
+
+// --- Web Speech API Recording (works in Chrome/Edge without any server) ---
+
+function startWebSpeechRecording() {
+    try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        state.recognition = new SpeechRecognition();
+
+        // Configure recognition
+        const isBosnian = elements.languageSelect.value === 'bs';
+        state.recognition.lang = isBosnian ? 'bs-BA' : 'en-US';
+        state.recognition.continuous = true;
+        state.recognition.interimResults = true;
+
+        // UI Updates
+        state.isRecording = true;
+        state.transcriptText = '';
+        state.translationText = '';
+        updateTranscript('');
+        elements.translationText.textContent = '';
+
+        elements.recordBtn.classList.add('recording');
+        elements.recordStatus.textContent = 'Listening... (Browser Speech)';
+        elements.recordingInfo.classList.add('active');
+
+        state.recordingStartTime = Date.now();
+        state.recordingTimer = setInterval(updateTimer, 1000);
+
+        state.recognition.onresult = (event) => {
+            let finalTranscript = '';
+            let interimTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript + ' ';
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            if (finalTranscript) {
+                state.transcriptText += finalTranscript;
+                updateTranscript(state.transcriptText);
+
+                // Translate Bosnian to English
+                if (elements.languageSelect.value === 'bs') {
+                    translateText(finalTranscript);
+                }
+            }
+
+            // Show interim results in real-time
+            if (interimTranscript) {
+                updateTranscript(state.transcriptText + interimTranscript);
+            }
+        };
+
+        state.recognition.onerror = (event) => {
+            console.error('Speech Recognition Error:', event.error);
+            if (event.error === 'not-allowed') {
+                showToast('Microphone access denied. Please allow microphone access.', 'error');
+            } else if (event.error === 'network') {
+                showToast('Network error. Check your internet connection.', 'error');
+            } else if (event.error === 'no-speech') {
+                // Don't show error for no-speech, just continue listening
+                console.log('No speech detected, continuing...');
+            } else {
+                showToast(`Speech recognition error: ${event.error}`, 'error');
+            }
+        };
+
+        state.recognition.onend = () => {
+            // Auto-restart if still recording (continuous mode sometimes stops)
+            if (state.isRecording) {
+                try {
+                    state.recognition.start();
+                } catch (e) {
+                    console.log('Recognition restart skipped:', e.message);
+                }
+            }
+        };
+
+        state.recognition.start();
+        console.log('Started Web Speech API recognition');
+        showToast('🎤 Listening... (using browser speech recognition)', 'success');
+
+    } catch (error) {
+        console.error('Web Speech API Error:', error);
+        showToast('Speech recognition failed. Try Chrome or Edge browser.', 'error');
+        stopRecording();
+    }
+}
+
+// --- Vosk Recording (requires local server) ---
+
+async function startVoskRecording() {
     try {
         state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -227,7 +340,7 @@ async function startRecording() {
             elements.translationText.textContent = '';
 
             elements.recordBtn.classList.add('recording');
-            elements.recordStatus.textContent = 'Listening...';
+            elements.recordStatus.textContent = 'Listening... (Vosk Server)';
             elements.recordingInfo.classList.add('active');
 
             state.recordingStartTime = Date.now();
@@ -245,8 +358,8 @@ async function startRecording() {
                     state.transcriptText += newText + ' ';
                     updateTranscript(state.transcriptText);
 
-                    // Translate
-                    if (elements.languageSelect.value === 'bs-BA') {
+                    // Translate Bosnian to English in real-time
+                    if (elements.languageSelect.value === 'bs') {
                         translateText(newText);
                     }
                 }
@@ -255,8 +368,25 @@ async function startRecording() {
 
         state.voskSocket.onerror = (error) => {
             console.error('Vosk WebSocket Error:', error);
-            showToast('Connection to Vosk server failed. Check settings.', 'error');
-            stopRecording();
+            console.error('Attempted to connect to:', state.voskUrl);
+            showToast(`Cannot connect to Vosk server. Trying browser speech...`, 'warning');
+
+            // Cleanup Vosk attempt and try Web Speech API
+            if (state.mediaStream) {
+                state.mediaStream.getTracks().forEach(track => track.stop());
+                state.mediaStream = null;
+            }
+            if (state.audioContext) {
+                state.audioContext.close();
+                state.audioContext = null;
+            }
+
+            // Fallback to Web Speech API
+            if (isWebSpeechSupported()) {
+                startWebSpeechRecording();
+            } else {
+                showToast('No speech recognition available. Use Chrome/Edge browser.', 'error');
+            }
         };
 
         state.voskSocket.onclose = () => {
@@ -310,6 +440,17 @@ function stopRecording() {
     elements.recordStatus.textContent = 'Tap to start recording';
     elements.recordingInfo.classList.remove('active');
 
+    // Stop Web Speech API recognition
+    if (state.recognition) {
+        try {
+            state.recognition.stop();
+        } catch (e) {
+            console.log('Recognition stop error:', e.message);
+        }
+        state.recognition = null;
+    }
+
+    // Stop Vosk connection
     if (state.voskSocket) {
         state.voskSocket.close();
         state.voskSocket = null;
@@ -390,38 +531,58 @@ function floatTo16BitPCM(output) {
 // --- LibreTranslate Logic ---
 
 async function translateText(text, immediate = false) {
-    if (!text) return;
+    if (!text || text.trim().length === 0) return;
 
     const doTranslate = async () => {
         try {
             elements.translationStatus.classList.add('active');
 
-            const response = await fetch(`${state.libreUrl}/translate`, {
-                method: "POST",
-                body: JSON.stringify({
-                    q: text,
-                    source: "bs", // Bosnian
-                    target: "en", // English
-                    format: "text"
-                }),
-                headers: { "Content-Type": "application/json" }
-            });
+            // Check if LibreTranslate URL is configured
+            if (!state.libreUrl) {
+                throw new Error('LibreTranslate URL not configured. Please check settings.');
+            }
 
-            if (!response.ok) throw new Error(`Translation failed: ${response.statusText}`);
+            let response;
+            try {
+                response = await fetch(`${state.libreUrl}/translate`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        q: text,
+                        source: "bs", // Bosnian
+                        target: "en", // English
+                        format: "text"
+                    }),
+                    headers: { "Content-Type": "application/json" }
+                });
+            } catch (fetchError) {
+                // Network error - server unreachable
+                console.error('Network error connecting to LibreTranslate:', fetchError);
+                throw new Error(`Cannot reach LibreTranslate server at ${state.libreUrl}. Is it running?`);
+            }
 
-            const data = await response.json();
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Unknown error');
+                console.error('LibreTranslate HTTP error:', response.status, errorText);
+                throw new Error(`Translation failed (HTTP ${response.status}): ${response.statusText}`);
+            }
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                console.error('Failed to parse translation response:', parseError);
+                throw new Error('Invalid response from translation server');
+            }
+
+            if (data.error) {
+                // LibreTranslate returns error in response body
+                console.error('LibreTranslate API error:', data.error);
+                throw new Error(`Translation error: ${data.error}`);
+            }
 
             if (data.translatedText) {
-                // For file upload (immediate), we replace. For live, we might want to append or replace.
-                // Since we pass the FULL text for file upload, replacing is correct.
-                // For live, we usually append to state.transcriptText and call this with the NEW chunk.
-                // Wait, for live recording, we are appending newText to state.transcriptText, 
-                // but passing ONLY newText to translateText.
-                // So for live, we should APPEND.
-                // For file upload, we pass the WHOLE text.
-
-                // Let's handle this by checking if we are in 'immediate' mode (file upload) or not.
-
+                // For file upload (immediate), we replace the entire translation.
+                // For live recording, we append to existing translation.
                 if (immediate) {
                     state.translationText = data.translatedText;
                     elements.translationText.textContent = data.translatedText;
@@ -432,11 +593,13 @@ async function translateText(text, immediate = false) {
                     state.translationText = newTranslation;
                     elements.translationText.textContent = newTranslation;
                 }
+            } else {
+                console.warn('Translation response missing translatedText:', data);
             }
 
         } catch (error) {
             console.error('LibreTranslate Error:', error);
-            showToast('Translation failed. Check settings.', 'warning');
+            showToast(`Translation failed: ${error.message}`, 'error');
         } finally {
             elements.translationStatus.classList.remove('active');
         }
@@ -532,14 +695,9 @@ async function transcribeAudioFile() {
         updateProgress(100, 'Complete!');
         showToast('✅ Transcription complete!', 'success');
 
-        // Translate full text
-        if (elements.languageSelect.value === 'bs-BA') {
+        // Translate full text (Bosnian to English)
+        if (elements.languageSelect.value === 'bs') {
             updateProgress(100, 'Translating...');
-            // Use the LibreTranslate function
-            // Note: LibreTranslate might also need chunking if text is huge, 
-            // but for now we'll try sending it all or rely on translateText's logic if we improve it.
-            // Since translateText is currently simple, let's just call it.
-            // If the text is very long, we might want to split it by sentences, but let's start with this.
             await translateText(state.transcriptText, true);
         }
 
@@ -644,7 +802,7 @@ function updateStats() {
 function copyTranscript() {
     const original = elements.transcriptText.textContent;
     const translated = elements.translationText.textContent;
-    const text = (elements.languageSelect.value === 'bs-BA' && translated)
+    const text = (elements.languageSelect.value === 'bs' && translated)
         ? `Original:\n${original}\n\nTranslation:\n${translated}`
         : original;
 
@@ -656,7 +814,7 @@ function copyTranscript() {
 function downloadTranscript() {
     const original = elements.transcriptText.textContent;
     const translated = elements.translationText.textContent;
-    const text = (elements.languageSelect.value === 'bs-BA' && translated)
+    const text = (elements.languageSelect.value === 'bs' && translated)
         ? `Original:\n${original}\n\nTranslation:\n${translated}`
         : original;
 
