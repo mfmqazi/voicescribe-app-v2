@@ -143,16 +143,24 @@ body::before {
     letter-spacing: -0.02em;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 .language-select {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
-    padding: 8px 16px;
-    border-radius: var(--radius-md);
-    font-size: 0.9rem;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 500;
     cursor: pointer;
     outline: none;
     transition: all var(--transition-fast);
+    min-width: 140px;
 }
 
 .language-select:hover {
@@ -160,8 +168,34 @@ body::before {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.language-select:focus {
+    border-color: var(--primary-purple);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
 .language-select option {
     background: var(--dark-surface);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
     color: var(--text-primary);
 }
 
