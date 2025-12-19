@@ -205,8 +205,13 @@ function switchMode(mode) {
 }
 
 function updateLanguageLabels() {
-    const isBosnian = elements.languageSelect.value === 'bs';
-    elements.originalLanguageLabel.textContent = isBosnian ? '🇧🇦 Bosnian (Original)' : '🇺🇸 English (Original)';
+    const lang = elements.languageSelect.value;
+    const labels = {
+        'bs': '🇧🇦 Bosnian (Original)',
+        'hi': '🇮🇳 Hindi (Original)',
+        'en': '🇺🇸 English (Original)'
+    };
+    elements.originalLanguageLabel.textContent = labels[lang] || '� Original';
 }
 
 // --- Recording Logic ---
@@ -233,9 +238,13 @@ function startWebSpeechRecording() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         state.recognition = new SpeechRecognition();
 
-        // Configure recognition
-        const isBosnian = elements.languageSelect.value === 'bs';
-        state.recognition.lang = isBosnian ? 'bs-BA' : 'en-US';
+        // Configure recognition language
+        const langMap = {
+            'bs': 'bs-BA',  // Bosnian
+            'hi': 'hi-IN',  // Hindi
+            'en': 'en-US'   // English
+        };
+        state.recognition.lang = langMap[elements.languageSelect.value] || 'en-US';
         state.recognition.continuous = true;
         state.recognition.interimResults = true;
 
@@ -270,9 +279,10 @@ function startWebSpeechRecording() {
                 state.transcriptText += finalTranscript;
                 updateTranscript(state.transcriptText);
 
-                // Translate Bosnian to English
-                if (elements.languageSelect.value === 'bs') {
-                    translateText(finalTranscript);
+                // Translate non-English languages to English
+                const lang = elements.languageSelect.value;
+                if (lang === 'bs' || lang === 'hi') {
+                    translateText(finalTranscript, false, lang);
                 }
             }
 
@@ -358,9 +368,10 @@ async function startVoskRecording() {
                     state.transcriptText += newText + ' ';
                     updateTranscript(state.transcriptText);
 
-                    // Translate Bosnian to English in real-time
-                    if (elements.languageSelect.value === 'bs') {
-                        translateText(newText);
+                    // Translate non-English languages to English
+                    const lang = elements.languageSelect.value;
+                    if (lang === 'bs' || lang === 'hi') {
+                        translateText(newText, false, lang);
                     }
                 }
             }
@@ -530,7 +541,7 @@ function floatTo16BitPCM(output) {
 
 // --- LibreTranslate Logic ---
 
-async function translateText(text, immediate = false) {
+async function translateText(text, immediate = false, sourceLang = 'bs') {
     if (!text || text.trim().length === 0) return;
 
     const doTranslate = async () => {
@@ -548,8 +559,8 @@ async function translateText(text, immediate = false) {
                     method: "POST",
                     body: JSON.stringify({
                         q: text,
-                        source: "bs", // Bosnian
-                        target: "en", // English
+                        source: sourceLang, // bs = Bosnian, hi = Hindi
+                        target: "en",       // English
                         format: "text"
                     }),
                     headers: { "Content-Type": "application/json" }
@@ -695,10 +706,11 @@ async function transcribeAudioFile() {
         updateProgress(100, 'Complete!');
         showToast('✅ Transcription complete!', 'success');
 
-        // Translate full text (Bosnian to English)
-        if (elements.languageSelect.value === 'bs') {
+        // Translate non-English languages to English
+        const lang = elements.languageSelect.value;
+        if (lang === 'bs' || lang === 'hi') {
             updateProgress(100, 'Translating...');
-            await translateText(state.transcriptText, true);
+            await translateText(state.transcriptText, true, lang);
         }
 
     } catch (error) {
@@ -802,7 +814,8 @@ function updateStats() {
 function copyTranscript() {
     const original = elements.transcriptText.textContent;
     const translated = elements.translationText.textContent;
-    const text = (elements.languageSelect.value === 'bs' && translated)
+    const lang = elements.languageSelect.value;
+    const text = ((lang === 'bs' || lang === 'hi') && translated)
         ? `Original:\n${original}\n\nTranslation:\n${translated}`
         : original;
 
@@ -814,7 +827,8 @@ function copyTranscript() {
 function downloadTranscript() {
     const original = elements.transcriptText.textContent;
     const translated = elements.translationText.textContent;
-    const text = (elements.languageSelect.value === 'bs' && translated)
+    const lang = elements.languageSelect.value;
+    const text = ((lang === 'bs' || lang === 'hi') && translated)
         ? `Original:\n${original}\n\nTranslation:\n${translated}`
         : original;
 
